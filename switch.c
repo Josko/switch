@@ -1,20 +1,20 @@
 /*
-* Switch, switches the pointer and focus to the next X screen using xcb
-* Copyright (C) 2011 Joško Nikolić
-*
-* This program is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ * Switch, switches the pointer and focus to the next X screen using xcb
+ * Copyright (C) 2011 Joško Nikolić
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,7 +23,7 @@
 #include <xcb/xcb.h>
 
 #define PROGRAM_NAME "Switch"
-#define PROGRAM_VERSION "0.1"
+#define PROGRAM_VERSION "1.0"
 
 static struct option const long_options[] =
 {
@@ -36,9 +36,8 @@ static struct option const long_options[] =
 static void usage(char *argv[])
 {
 	printf("Usage: %s\n"
-		"\t-v, --version	Show version and exit\n"
-		"\t-h, --help	Show this help message and exit\n",
-		argv[0]);
+			"\t-v, --version	Show version and exit\n"
+			"\t-h, --help	Show this help message and exit\n", argv[0]);
 }
 
 int main(int argc, char *argv[])
@@ -48,14 +47,14 @@ int main(int argc, char *argv[])
 	 */
 
 	char c;
-	int i, screenNum;
+	int i, screen_num;
 
-	xcb_connection_t 							*connection;
-	xcb_screen_t 									*next_screen;
-	xcb_screen_t									*current_screen;
-	xcb_screen_iterator_t 				iterator;
-	xcb_setup_t 									*setup;
-	xcb_query_pointer_reply_t			*pointer;
+	xcb_connection_t *connection;
+	xcb_screen_t *next_screen;
+	xcb_screen_t *current_screen;
+	xcb_screen_iterator_t iterator;
+	xcb_setup_t *setup;
+	xcb_query_pointer_reply_t *pointer;
 
 	/*
 	 * handle the arguments
@@ -71,19 +70,21 @@ int main(int argc, char *argv[])
 
 			case 'v':
 				printf("GPL %s: %s\n"
-							 "Copyright (C) 2011 Joško Nikolić\n", PROGRAM_NAME, PROGRAM_VERSION);
+						"Copyright (C) 2011 Joško Nikolić\n", PROGRAM_NAME,
+						PROGRAM_VERSION);
 				return 0;
 
 			default:
 				usage(argv);
+				break;
 		}
 	}
 
 	/*
-	 * open the connection and find the current screen
+	 * open the connection
 	 */
 
-	connection = xcb_connect(NULL, &screenNum);
+	connection = xcb_connect(NULL, &screen_num);
 
 	if (xcb_connection_has_error(connection))
 	{
@@ -94,9 +95,12 @@ int main(int argc, char *argv[])
 	setup = xcb_get_setup(connection);
 	iterator = xcb_setup_roots_iterator(setup);
 
-	for (i = 0; i < screenNum; ++i)
-		xcb_screen_next(&iterator);
+	/*
+	 * find the current screen
+	 */
 
+	for (i = 0; i < screen_num; ++i)
+		xcb_screen_next(&iterator);
 
 	current_screen = iterator.data;
 
@@ -110,7 +114,8 @@ int main(int argc, char *argv[])
 	 * if the next screen doesn't exist move the iterator to start
 	 */
 
-	if (0 == (iterator.data)->width_in_pixels && 0 == (iterator.data)->height_in_pixels)
+	if (0 == (iterator.data)->width_in_pixels
+			&& 0 == (iterator.data)->height_in_pixels)
 	{
 		iterator = xcb_setup_roots_iterator(setup);
 
@@ -118,7 +123,9 @@ int main(int argc, char *argv[])
 		 * the next screen is the current one
 		 */
 
-		if ((iterator.data)->width_in_pixels == current_screen->width_in_pixels && (iterator.data)->height_in_pixels == current_screen->height_in_pixels)
+		if ((iterator.data)->width_in_pixels == current_screen->width_in_pixels
+				&& (iterator.data)->height_in_pixels
+						== current_screen->height_in_pixels)
 		{
 			puts("ERROR: only one screen");
 			return EXIT_SUCCESS;
@@ -132,24 +139,27 @@ int main(int argc, char *argv[])
 	 */
 
 	pointer = xcb_query_pointer_reply(connection,
-																		xcb_query_pointer_unchecked(connection, current_screen->root),
-																		NULL);
+			xcb_query_pointer_unchecked(connection, current_screen->root),
+			NULL);
 
 	if (NULL != pointer)
 	{
-	 /*
-	 	* warp the pointer
-	 	*/
+		/*
+		 * warp the pointer and focus the new screen
+		 */
 
-		xcb_warp_pointer(connection, XCB_NONE, next_screen->root, 0, 0, 0, 0, pointer->win_x, pointer->win_y);
-		xcb_set_input_focus(connection, XCB_INPUT_FOCUS_PARENT, next_screen->root, XCB_CURRENT_TIME);
+		xcb_warp_pointer(connection, XCB_NONE, next_screen->root, 0, 0, 0, 0,
+				pointer->win_x, pointer->win_y);
+
+		xcb_set_input_focus(connection, XCB_INPUT_FOCUS_PARENT,
+				next_screen->root, XCB_CURRENT_TIME);
+
 		xcb_flush(connection);
-
 		free(pointer);
 	}
 	else
 		puts("ERROR: couldn't query pointer");
-	
+
 	xcb_disconnect(connection);
 
 	return EXIT_SUCCESS;
