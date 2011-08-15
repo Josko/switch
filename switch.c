@@ -128,6 +128,7 @@ int main(int argc, char *argv[])
 						== current_screen->height_in_pixels)
 		{
 			puts("ERROR: only one screen");
+			xcb_disconnect(connection);
 			return EXIT_SUCCESS;
 		}
 	}
