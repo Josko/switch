@@ -23,145 +23,131 @@
 #include <xcb/xcb.h>
 
 #define PROGRAM_NAME "Switch"
-#define PROGRAM_VERSION "1.0"
+#define PROGRAM_VERSION "1.1"
 
 static struct option const long_options[] =
 {
-	{"help", no_argument, NULL, 'h'},
-	{"version", no_argument, NULL, 'v'},
-	{"screen", required_argument, NULL, 's'},
-	{NULL, 0, NULL, 0}
+    {"help", no_argument, NULL, 'h'},
+    {"version", no_argument, NULL, 'v'},
+    {"screen", required_argument, NULL, 's'},
+    {NULL, 0, NULL, 0}
 };
 
 static void usage(char *argv[])
 {
-	printf("Usage: %s\n"
-			"\t-v, --version	Show version and exit\n"
-			"\t-h, --help	Show this help message and exit\n", argv[0]);
+    printf("Usage: %s\n"
+            "\t-v, --version    Show version and exit\n"
+            "\t-h, --help   Show this help message and exit\n", argv[0]);
 }
 
 int main(int argc, char *argv[])
 {
-	/*
-	 * variables
-	 */
+    /*
+     * variables
+     */
 
-	char c;
-	int i, screen_num;
+    char c;
+    int i, screen_num;
 
-	xcb_connection_t *connection;
-	xcb_screen_t *next_screen;
-	xcb_screen_t *current_screen;
-	xcb_screen_iterator_t iterator;
-	xcb_setup_t *setup;
-	xcb_query_pointer_reply_t *pointer;
+    xcb_connection_t *connection;
+    xcb_screen_t *next_screen;
+    xcb_screen_t *current_screen;
+    xcb_screen_iterator_t iterator;
+    xcb_query_pointer_reply_t *pointer;
 
-	/*
-	 * handle the arguments
-	 */
+    /*
+     * handle the arguments
+     */
 
-	while (-1 != (c = getopt_long(argc, argv, "hv", long_options, NULL)))
-	{
-		switch (c)
-		{
-			case 'h':
-				usage(argv);
-				return 0;
+    while (-1 != (c = getopt_long(argc, argv, "hv", long_options, NULL)))
+    {
+        switch (c)
+        {
+            case 'h':
+                usage(argv);
+                return 0;
 
-			case 'v':
-				printf("GPL %s: %s\n"
-						"Copyright (C) 2011 Joško Nikolić\n", PROGRAM_NAME,
-						PROGRAM_VERSION);
-				return 0;
+            case 'v':
+                printf("GPL %s: %s\n"
+                        "Copyright (C) 2011 Joško Nikolić\n", PROGRAM_NAME,
+                        PROGRAM_VERSION);
+                return 0;
 
-			default:
-				usage(argv);
-				break;
-		}
-	}
+            default:
+                usage(argv);
+                break;
+        }
+    }
 
-	/*
-	 * open the connection
-	 */
+    /*
+     * open the connection
+     */
 
-	connection = xcb_connect(NULL, &screen_num);
+    connection = xcb_connect(NULL, &screen_num);
 
-	if (xcb_connection_has_error(connection))
-	{
-		puts("ERROR: couldn't open display");
-		exit(EXIT_FAILURE);
-	}
+    if (xcb_connection_has_error(connection))
+    {
+        puts("ERROR: couldn't open display");
+        exit(EXIT_FAILURE);
+    }
 
-	setup = xcb_get_setup(connection);
-	iterator = xcb_setup_roots_iterator(setup);
+    const xcb_setup_t *setup = xcb_get_setup(connection);
+    iterator = xcb_setup_roots_iterator(setup);
 
-	/*
-	 * find the current screen
-	 */
+    /*
+     * find the current screen
+     */
 
-	for (i = 0; i < screen_num; ++i)
-		xcb_screen_next(&iterator);
+    for (i = 0; i < screen_num; ++i)
+        xcb_screen_next(&iterator);
 
-	current_screen = iterator.data;
+    current_screen = iterator.data;
 
-	/*
-	 * get the next screen to switch to
-	 */
+    /*
+     * get the next screen to switch to
+     */
 
-	xcb_screen_next(&iterator);
+    xcb_screen_next(&iterator);
 
-	/*
-	 * if the next screen doesn't exist move the iterator to start
-	 */
+    /*
+     * if the next screen doesn't exist move the iterator to start
+     */
 
-	if (0 == (iterator.data)->width_in_pixels
-			&& 0 == (iterator.data)->height_in_pixels)
-	{
-		iterator = xcb_setup_roots_iterator(setup);
+    if (0 == (iterator.data)->width_in_pixels
+            && 0 == (iterator.data)->height_in_pixels)
+    {
+        iterator = xcb_setup_roots_iterator(setup);
+    }
 
-		/*
-		 * the next screen is the current one
-		 */
+    next_screen = iterator.data;
 
-		if ((iterator.data)->width_in_pixels == current_screen->width_in_pixels
-				&& (iterator.data)->height_in_pixels
-						== current_screen->height_in_pixels)
-		{
-			puts("ERROR: only one screen");
-			xcb_disconnect(connection);
-			return EXIT_SUCCESS;
-		}
-	}
+    /*
+     * get pointer information
+     */
 
-	next_screen = iterator.data;
+    pointer = xcb_query_pointer_reply(connection,
+            xcb_query_pointer_unchecked(connection, current_screen->root),
+            NULL);
 
-	/*
-	 * get pointer information
-	 */
+    if (NULL != pointer)
+    {
+        /*
+         * warp the pointer and focus the new screen
+         */
 
-	pointer = xcb_query_pointer_reply(connection,
-			xcb_query_pointer_unchecked(connection, current_screen->root),
-			NULL);
+        xcb_warp_pointer(connection, XCB_NONE, next_screen->root, 0, 0, 0, 0,
+                pointer->win_x, pointer->win_y);
 
-	if (NULL != pointer)
-	{
-		/*
-		 * warp the pointer and focus the new screen
-		 */
+        xcb_set_input_focus(connection, XCB_INPUT_FOCUS_PARENT,
+                next_screen->root, XCB_CURRENT_TIME);
 
-		xcb_warp_pointer(connection, XCB_NONE, next_screen->root, 0, 0, 0, 0,
-				pointer->win_x, pointer->win_y);
+        xcb_flush(connection);
+        free(pointer);
+    }
+    else
+        puts("ERROR: couldn't query pointer");
 
-		xcb_set_input_focus(connection, XCB_INPUT_FOCUS_PARENT,
-				next_screen->root, XCB_CURRENT_TIME);
+    xcb_disconnect(connection);
 
-		xcb_flush(connection);
-		free(pointer);
-	}
-	else
-		puts("ERROR: couldn't query pointer");
-
-	xcb_disconnect(connection);
-
-	return EXIT_SUCCESS;
+    return EXIT_SUCCESS;
 }
